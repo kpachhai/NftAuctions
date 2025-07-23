@@ -52,7 +52,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
         require(_nftContract.supportsInterface(type(IERC721).interfaceId), "Invalid NFT contract");
         _nftContract.transferFrom(msg.sender, address(this), _tokenId);
 
-        uint256 auctionId = auctionCount++;
+        uint256 auctionId = auctionCount;
         auctions[auctionId] = Auction({
             seller: msg.sender,
             highestBidder: address(0),
@@ -70,10 +70,12 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             msg.sender,
             address(_nftContract),
             _tokenId,
+            _startingPrice,
             block.timestamp,
-            block.timestamp + _duration,
-            _startingPrice
+            block.timestamp + _duration
         );
+
+        auctionCount += 1;
     }
 
     function placeBid(uint256 _auctionId) external payable nonReentrant {
@@ -109,9 +111,5 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             // No bids were placed, return NFT to the seller
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
         }
-    }
-
-    function withdraw() external onlyOwner {
-        payable(owner()).transfer(address(this).balance);
     }
 }
