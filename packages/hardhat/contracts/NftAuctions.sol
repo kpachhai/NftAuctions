@@ -45,21 +45,20 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
     function createAuction(
         IERC721 _nftContract,
         uint256 _tokenId,
-        uint256 _startingPrice,
-        uint256 _duration
+        uint256 _startingPriceWei,
+        uint256 _durationSecs
     ) external nonReentrant {
-        require(_startingPrice > 0, "Starting price must be > 0");
-        require(_nftContract.supportsInterface(type(IERC721).interfaceId), "Invalid NFT contract");
+        require(_startingPriceWei > 0, "Starting price must be > 0");
         _nftContract.transferFrom(msg.sender, address(this), _tokenId);
 
         uint256 auctionId = auctionCount;
         auctions[auctionId] = Auction({
             seller: msg.sender,
             highestBidder: address(0),
-            highestBid: _startingPrice,
+            highestBid: _startingPriceWei,
             startTime: block.timestamp,
-            endTime: block.timestamp + _duration,
-            startingPrice: _startingPrice,
+            endTime: block.timestamp + _durationSecs,
+            startingPrice: _startingPriceWei,
             nftContract: _nftContract,
             tokenId: _tokenId,
             ended: false
@@ -70,9 +69,9 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             msg.sender,
             address(_nftContract),
             _tokenId,
-            _startingPrice,
+            _startingPriceWei,
             block.timestamp,
-            block.timestamp + _duration
+            block.timestamp + _durationSecs
         );
 
         auctionCount += 1;
@@ -111,5 +110,43 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             // No bids were placed, return NFT to the seller
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
         }
+    }
+
+    function getOngoingAuctions() external view returns (Auction[] memory) {
+        Auction[] memory ongoing = new Auction[](auctionCount);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < auctionCount; i++) {
+            if (!auctions[i].ended && block.timestamp < auctions[i].endTime) {
+                ongoing[count] = auctions[i];
+                count++;
+            }
+        }
+
+        // Resize the array to the actual number of ongoing auctions
+        assembly {
+            mstore(ongoing, count)
+        }
+
+        return ongoing;
+    }
+
+    function getExpiredAuctions() external view returns (Auction[] memory) {
+        Auction[] memory expired = new Auction[](auctionCount);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < auctionCount; i++) {
+            if (auctions[i].ended || block.timestamp >= auctions[i].endTime) {
+                expired[count] = auctions[i];
+                count++;
+            }
+        }
+
+        // Resize the array to the actual number of ongoing auctions
+        assembly {
+            mstore(expired, count)
+        }
+
+        return expired;
     }
 }
