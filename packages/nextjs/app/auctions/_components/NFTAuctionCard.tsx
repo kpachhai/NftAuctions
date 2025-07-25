@@ -6,7 +6,6 @@ import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaf
 
 export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
   const [bidAmount, setBidAmount] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
     minutes: 0,
@@ -37,8 +36,6 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
       return;
     }
 
-    setIsLoading(true);
-
     try {
       await placeBidAsync({
         functionName: "placeBid",
@@ -49,8 +46,17 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
       setBidAmount("");
     } catch (err: any) {
       console.error("Bid placement failed:", err);
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const handleClaimNFT = async () => {
+    try {
+      await placeBidAsync({
+        functionName: "endAuction",
+        args: [BigInt(auction.auctionId)],
+      });
+    } catch (err: any) {
+      console.error("Claim NFT failed:", err);
     }
   };
 
@@ -163,12 +169,20 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
           </div>
 
           <button
-            className={`btn btn-primary w-full ${isLoading ? "loading" : ""}`}
+            className={`btn btn-primary w-full`}
             onClick={handlePlaceBid}
-            disabled={isLoading || Date.now() / 1000 > auction.endTime}
+            disabled={Date.now() / 1000 > auction.endTime}
           >
-            {isLoading ? "Placing Bid..." : "Place Bid"}
+            {"Place Bid"}
             {Date.now() / 1000 > auction.endTime && " (Auction Ended)"}
+          </button>
+
+          <button
+            className={`btn btn-primary w-full`}
+            onClick={handleClaimNFT}
+            disabled={Date.now() / 1000 < auction.endTime}
+          >
+            {"Claim NFT"}
           </button>
         </div>
       </div>
