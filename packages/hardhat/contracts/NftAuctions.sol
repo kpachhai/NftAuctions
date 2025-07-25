@@ -46,7 +46,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
         IERC721 _nftContract,
         uint256 _tokenId,
         uint256 _startingPriceWei,
-        uint256 _durationSecs
+        uint256 _durationMinutes
     ) external nonReentrant {
         require(_startingPriceWei > 0, "Starting price must be > 0");
         _nftContract.transferFrom(msg.sender, address(this), _tokenId);
@@ -57,7 +57,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             highestBidder: address(0),
             highestBid: _startingPriceWei,
             startTime: block.timestamp,
-            endTime: block.timestamp + _durationSecs,
+            endTime: block.timestamp + _durationMinutes * 1 minutes,
             startingPrice: _startingPriceWei,
             nftContract: _nftContract,
             tokenId: _tokenId,
@@ -71,7 +71,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             _tokenId,
             _startingPriceWei,
             block.timestamp,
-            block.timestamp + _durationSecs
+            block.timestamp + _durationMinutes * 1 minutes
         );
 
         auctionCount += 1;
@@ -123,7 +123,6 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             }
         }
 
-        // Resize the array to the actual number of ongoing auctions
         assembly {
             mstore(ongoing, count)
         }
@@ -142,7 +141,6 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             }
         }
 
-        // Resize the array to the actual number of ongoing auctions
         assembly {
             mstore(expired, count)
         }
