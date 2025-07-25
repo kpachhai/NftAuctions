@@ -10,6 +10,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 
 contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
     struct Auction {
+        uint256 auctionId;
         address seller;
         address highestBidder;
         uint256 highestBid;
@@ -53,6 +54,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
         uint256 auctionId = auctionCount;
         auctions[auctionId] = Auction({
+            auctionId: auctionId,
             seller: msg.sender,
             highestBidder: address(0),
             highestBid: _startingPriceWei,
@@ -110,6 +112,10 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             // No bids were placed, return NFT to the seller
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
         }
+    }
+
+    function getAuction(uint256 _auctionId) external view returns (Auction memory) {
+        return auctions[_auctionId];
     }
 
     function getOngoingAuctions() external view returns (Auction[] memory) {

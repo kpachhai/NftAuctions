@@ -15,6 +15,7 @@ export interface Collectible extends Partial<NFTMetaData> {
 }
 
 export interface Auction extends Partial<NFTMetaData> {
+  auctionId: bigint;
   tokenId: bigint;
   startingPrice: bigint;
   duration: bigint;
@@ -58,7 +59,8 @@ export const Auctions = () => {
         return;
 
       setAuctionsLoading(true);
-      setAuctionsData([]);
+
+      const updatedAuctionsData: Auction[] = [];
       const auctionsCount = ongoingAuctions.length;
       for (let auctionIndex = 0; auctionIndex < auctionsCount; auctionIndex++) {
         try {
@@ -71,6 +73,7 @@ export const Auctions = () => {
           const nftMetadata: NFTMetaData = await getMetadataFromIPFS(ipfsHash);
 
           const auction: Auction = {
+            auctionId: ongoingAuctions[auctionIndex].auctionId,
             tokenId: tokenId,
             startingPrice: ongoingAuctions[auctionIndex].startingPrice,
             duration: ongoingAuctions[auctionIndex].endTime - ongoingAuctions[auctionIndex].startTime,
@@ -84,20 +87,19 @@ export const Auctions = () => {
             ended: ongoingAuctions[auctionIndex].ended,
             ...nftMetadata,
           };
-          auctionsData.push(auction);
+          updatedAuctionsData.push(auction);
         } catch (e) {
-          notification.error("Error fetching all collectibles");
+          notification.error("Error fetching auctions");
           setAuctionsLoading(false);
           console.log(e);
         }
       }
 
-      setAuctionsData(auctionsData);
+      setAuctionsData(updatedAuctionsData);
       setAuctionsLoading(false);
     };
 
     updateOngoingAuctions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, ongoingAuctions]);
 
   if (auctionsLoading)
@@ -116,7 +118,7 @@ export const Auctions = () => {
       ) : (
         <div className="flex flex-wrap gap-4 my-8 px-5 justify-center">
           {auctionsData.map(item => (
-            <NFTAuctionCard auction={item} key={item.tokenId} />
+            <NFTAuctionCard auction={item} key={item.auctionId} />
           ))}
         </div>
       )}
@@ -155,7 +157,7 @@ export const ExpiredAuctions = () => {
         return;
 
       setAuctionsLoading(true);
-      setAuctionsData([]);
+      const updatedAuctionsData: Auction[] = [];
       const auctionsCount = expiredAuctions.length;
       for (let auctionIndex = 0; auctionIndex < auctionsCount; auctionIndex++) {
         try {
@@ -168,6 +170,7 @@ export const ExpiredAuctions = () => {
           const nftMetadata: NFTMetaData = await getMetadataFromIPFS(ipfsHash);
 
           const auction: Auction = {
+            auctionId: expiredAuctions[auctionIndex].auctionId,
             tokenId: tokenId,
             startingPrice: expiredAuctions[auctionIndex].startingPrice,
             duration: expiredAuctions[auctionIndex].endTime - expiredAuctions[auctionIndex].startTime,
@@ -181,15 +184,15 @@ export const ExpiredAuctions = () => {
             ended: expiredAuctions[auctionIndex].ended,
             ...nftMetadata,
           };
-          auctionsData.push(auction);
+          updatedAuctionsData.push(auction);
         } catch (e) {
-          notification.error("Error fetching all collectibles");
+          notification.error("Error fetching auctions");
           setAuctionsLoading(false);
           console.log(e);
         }
       }
 
-      setAuctionsData(auctionsData);
+      setAuctionsData(updatedAuctionsData);
       setAuctionsLoading(false);
     };
 
@@ -212,7 +215,7 @@ export const ExpiredAuctions = () => {
       ) : (
         <div className="flex flex-wrap gap-4 my-8 px-5 justify-center">
           {auctionsData.map(item => (
-            <NFTAuctionCard auction={item} key={item.tokenId} />
+            <NFTAuctionCard auction={item} key={item.auctionId} />
           ))}
         </div>
       )}

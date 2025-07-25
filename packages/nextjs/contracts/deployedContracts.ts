@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     NftAuctions: {
-      address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
       abi: [
         {
           inputs: [
@@ -606,6 +606,11 @@ const deployedContracts = {
           name: "auctions",
           outputs: [
             {
+              internalType: "uint256",
+              name: "auctionId",
+              type: "uint256",
+            },
+            {
               internalType: "address",
               name: "seller",
               type: "address",
@@ -771,11 +776,87 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_auctionId",
+              type: "uint256",
+            },
+          ],
+          name: "getAuction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "uint256",
+                  name: "auctionId",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "seller",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "highestBidder",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "highestBid",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "startTime",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "endTime",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "startingPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "contract IERC721",
+                  name: "nftContract",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "tokenId",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "ended",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct NftAuctions.Auction",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getExpiredAuctions",
           outputs: [
             {
               components: [
+                {
+                  internalType: "uint256",
+                  name: "auctionId",
+                  type: "uint256",
+                },
                 {
                   internalType: "address",
                   name: "seller",
@@ -836,6 +917,11 @@ const deployedContracts = {
           outputs: [
             {
               components: [
+                {
+                  internalType: "uint256",
+                  name: "auctionId",
+                  type: "uint256",
+                },
                 {
                   internalType: "address",
                   name: "seller",

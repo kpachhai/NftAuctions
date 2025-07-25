@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Collectible } from "./MyHoldings";
-import { parseEther } from "viem";
+import { parseGwei } from "viem";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 export const NFTCard = ({ nft }: { nft: Collectible }) => {
-  const [startingPrice, setStartingPrice] = useState("0.1"); // Default 0.1 ETH
+  const [startingPrice, setStartingPrice] = useState("1"); // Default 1 WEI
   const [durationMinutes, setDurationMinutes] = useState("1440"); // Default 24 hours
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +51,7 @@ export const NFTCard = ({ nft }: { nft: Collectible }) => {
         args: [
           yourCollectibleContract.address,
           BigInt(nft.id.toString()),
-          parseEther(startingPrice),
+          parseGwei(startingPrice),
           BigInt(durationMinutes),
         ],
       });
@@ -95,13 +95,12 @@ export const NFTCard = ({ nft }: { nft: Collectible }) => {
           <div className="flex flex-col gap-2 w-full">
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Starting Price (ETH)</span>
+                <span className="label-text">Starting Price (Gwei)</span>
               </label>
               <input
                 type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.1"
+                min="1"
+                placeholder="1"
                 className="input input-bordered"
                 value={startingPrice}
                 onChange={e => setStartingPrice(e.target.value)}
