@@ -1,8 +1,7 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
-import { NftAuctions } from "../typechain-types";
-import { MockERC721 } from "../typechain-types/contracts/mocks/MockERC721";
+import { NftAuctions, YourCollectible } from "../typechain-types";
 
 describe("NftAuctions", function () {
   let owner: SignerWithAddress;
@@ -10,7 +9,7 @@ describe("NftAuctions", function () {
   let bidder1: SignerWithAddress;
   let bidder2: SignerWithAddress;
   let nftAuctions: NftAuctions;
-  let mockERC721: MockERC721;
+  let yourCollectible: YourCollectible;
   const tokenId = 1;
   const startingPrice = ethers.parseEther("1.0");
   const duration = 86400; // 1 day in seconds
@@ -22,12 +21,12 @@ describe("NftAuctions", function () {
     [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
     // Deploy mock ERC721
-    const MockERC721 = await ethers.getContractFactory("contracts/mocks/MockERC721.sol:MockERC721");
-    mockERC721 = await MockERC721.deploy();
-    await mockERC721.waitForDeployment();
+    const YourCollectible = await ethers.getContractFactory("contracts/YourCollectible.sol:YourCollectible");
+    yourCollectible = await YourCollectible.deploy();
+    await yourCollectible.waitForDeployment();
 
     // Mint NFT to seller
-    await mockERC721.connect(seller).mint(seller.address, tokenId);
+    await yourCollectible.connect(seller).mint(seller.address, tokenId);
 
     // Deploy NftAuctions
     const NftAuctions = await ethers.getContractFactory("NftAuctions");
@@ -35,7 +34,7 @@ describe("NftAuctions", function () {
     await nftAuctions.waitForDeployment();
 
     nftAuctionsAddress = await nftAuctions.getAddress();
-    mockERC721Address = await mockERC721.getAddress();
+    mockERC721Address = await yourCollectible.getAddress();
   });
 
   describe("Deployment", function () {
@@ -51,7 +50,7 @@ describe("NftAuctions", function () {
 
   describe("createAuction", async function () {
     it("Should create an auction and emit event", async function () {
-      await mockERC721.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
       const tx = await nftAuctions.connect(seller).createAuction(mockERC721Address, tokenId, startingPrice, duration);
 
       // Verify event emission
@@ -70,11 +69,11 @@ describe("NftAuctions", function () {
       expect(auction.seller).to.equal(seller.address);
       expect(auction.highestBid).to.equal(startingPrice);
       expect(auction.ended).to.equal(false);
-      expect(await mockERC721.ownerOf(tokenId)).to.equal(nftAuctionsAddress);
+      expect(await yourCollectible.ownerOf(tokenId)).to.equal(nftAuctionsAddress);
     });
 
     it("Should revert with zero starting price", async function () {
-      await mockERC721.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
       await expect(
         nftAuctions.connect(seller).createAuction(
           mockERC721Address,
@@ -86,7 +85,7 @@ describe("NftAuctions", function () {
     });
 
     it("Should increment auctionCount", async function () {
-      await mockERC721.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
       await nftAuctions.connect(seller).createAuction(mockERC721Address, tokenId, startingPrice, duration);
       expect(await nftAuctions.auctionCount()).to.equal(1);
     });
@@ -94,7 +93,7 @@ describe("NftAuctions", function () {
 
   describe("placeBid", async function () {
     beforeEach(async function () {
-      await mockERC721.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
       await nftAuctions.connect(seller).createAuction(mockERC721Address, tokenId, startingPrice, duration);
     });
 
@@ -158,7 +157,7 @@ describe("NftAuctions", function () {
 
   describe("endAuction", function () {
     beforeEach(async function () {
-      await mockERC721.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
       await nftAuctions.connect(seller).createAuction(mockERC721Address, tokenId, startingPrice, duration);
     });
 
@@ -175,7 +174,7 @@ describe("NftAuctions", function () {
 
       await expect(tx).to.emit(nftAuctions, "AuctionEnded").withArgs(0, bidder1.address, bidAmount);
 
-      expect(await mockERC721.ownerOf(tokenId)).to.equal(bidder1.address);
+      expect(await yourCollectible.ownerOf(tokenId)).to.equal(bidder1.address);
 
       const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
       expect(sellerBalanceAfter).to.equal(sellerBalanceBefore + bidAmount);
@@ -187,7 +186,7 @@ describe("NftAuctions", function () {
       await ethers.provider.send("evm_mine", []);
 
       await nftAuctions.connect(owner).endAuction(0);
-      expect(await mockERC721.ownerOf(tokenId)).to.equal(seller.address);
+      expect(await yourCollectible.ownerOf(tokenId)).to.equal(seller.address);
     });
 
     it("Should revert if auction not ended", async function () {

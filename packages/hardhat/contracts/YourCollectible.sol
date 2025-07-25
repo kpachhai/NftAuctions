@@ -15,6 +15,10 @@ contract YourCollectible is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable 
         return "https://ipfs.io/ipfs/";
     }
 
+    function mint(address to, uint256 tokenId) public {
+        _mint(to, tokenId);
+    }
+
     function mintItem(address to, string memory uri) public returns (uint256) {
         tokenIdCounter += 1;
         uint256 tokenId = tokenIdCounter;
