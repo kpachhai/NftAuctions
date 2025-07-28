@@ -2,13 +2,10 @@
 pragma solidity ^0.8.20;
 
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import { ERC1363 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC1363.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
+contract NftAuctions is Ownable, ReentrancyGuard {
     struct Auction {
         uint256 auctionId;
         address seller;
@@ -45,7 +42,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
     event AuctionEnded(uint256 auctionId, address indexed winner, uint256 winningBid);
 
-    constructor(address initialOwner) ERC20("NftAuctions", "NFTA") ERC20Permit("NftAuctions") Ownable(initialOwner) {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     receive() external payable {}
 

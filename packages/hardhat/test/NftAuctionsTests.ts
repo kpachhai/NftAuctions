@@ -7,10 +7,9 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 describe("NftAuctions", function () {
   let nftAuctions: NftAuctions;
   let yourCollectible: YourCollectible;
-  let owner: HardhatEthersSigner;
-  let seller: HardhatEthersSigner;
-  let bidder1: HardhatEthersSigner;
-  let bidder2: HardhatEthersSigner;
+  const tokenId = 1;
+  const startingPrice = ethers.parseEther("1.0");
+  const duration = 1440; // 1 day in minutes
 
   let nftAuctionsAddress: string;
   let mockERC721Address: string;
@@ -37,9 +36,8 @@ describe("NftAuctions", function () {
   });
 
   describe("Deployment", function () {
-    it("Should deploy with correct initial values", async function () {
-      expect(await nftAuctions.name()).to.equal("NftAuctions");
-      expect(await nftAuctions.symbol()).to.equal("NFTA");
+    it("Should set the right owner", async function () {
+      expect(await nftAuctions.owner()).to.equal(owner.address);
     });
   });
 
@@ -108,7 +106,8 @@ describe("NftAuctions", function () {
     });
 
     it("Should revert if auction ended", async function () {
-      await ethers.provider.send("evm_increaseTime", [duration + 1]);
+      // Fast-forward time
+      await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
       await ethers.provider.send("evm_mine", []);
 
       await expect(
@@ -137,7 +136,8 @@ describe("NftAuctions", function () {
       const bidAmount = ethers.parseEther("1.5");
       await nftAuctions.connect(bidder1).placeBid(0, { value: bidAmount });
 
-      await ethers.provider.send("evm_increaseTime", [duration + 1]);
+      // Fast-forward time
+      await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
       await ethers.provider.send("evm_mine", []);
 
       const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
@@ -151,7 +151,8 @@ describe("NftAuctions", function () {
     });
 
     it("Should return NFT to seller if no bids", async function () {
-      await ethers.provider.send("evm_increaseTime", [duration + 1]);
+      // Fast-forward time
+      await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
       await ethers.provider.send("evm_mine", []);
 
       await nftAuctions.connect(seller).endAuction(0);
@@ -162,8 +163,9 @@ describe("NftAuctions", function () {
       await expect(nftAuctions.connect(owner).endAuction(0)).to.be.revertedWith("Auction not ended yet");
     });
 
-    it("Should revert if not authorized", async function () {
-      await ethers.provider.send("evm_increaseTime", [duration + 1]);
+    it("Should revert if already ended", async function () {
+      // Fast-forward time
+      await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
       await ethers.provider.send("evm_mine", []);
 
       await expect(nftAuctions.connect(bidder2).endAuction(0)).to.be.revertedWith("Not authorized to end auction");
