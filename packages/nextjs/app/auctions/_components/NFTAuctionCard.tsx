@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+<<<<<<< HEAD
 import { formatEther, parseGwei } from "viem";
+=======
+import { Auction } from "./Auctions";
+import { parseGwei } from "viem";
+>>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -20,6 +25,8 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
   const [isClaimLoading, setIsClaimLoading] = useState(false);
   const [isBidLoading, setIsBidLoading] = useState(false);
 
+  const { address: connectedAddress } = useAccount();
+
   const { writeContractAsync: placeBidAsync } = useScaffoldWriteContract({
     contractName: "NftAuctions",
   });
@@ -34,6 +41,19 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
     args: [auction.auctionId],
     watch: true,
   });
+
+  // Check if current user is the seller
+  const isSeller = connectedAddress?.toLowerCase() === auction.seller.toLowerCase();
+
+  // Check if current user is the owner (for emergency withdraw)
+  const { data: contractOwner } = useScaffoldReadContract({
+    contractName: "NftAuctions",
+    functionName: "owner",
+  });
+  const isOwner = connectedAddress?.toLowerCase() === contractOwner?.toLowerCase();
+
+  // Check if auction can be withdrawn (no bids placed)
+  const canWithdraw = auction.highestBidder === "0x0000000000000000000000000000000000000000";
 
   const handlePlaceBid = async () => {
     if (!bidAmount) {
@@ -87,6 +107,28 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
     } finally {
       setIsClaimLoading(false);
       refetchAuctionState();
+    }
+  };
+
+  const handleWithdrawAuction = async () => {
+    try {
+      await placeBidAsync({
+        functionName: "withdrawAuction",
+        args: [BigInt(auction.auctionId)],
+      });
+    } catch (err: any) {
+      console.error("Withdraw auction failed:", err);
+    }
+  };
+
+  const handleEmergencyWithdraw = async () => {
+    try {
+      await placeBidAsync({
+        functionName: "emergencyWithdraw",
+        args: [BigInt(auction.auctionId)],
+      });
+    } catch (err: any) {
+      console.error("Emergency withdraw failed:", err);
     }
   };
 
@@ -212,12 +254,23 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
           </div>
         )}
 
+<<<<<<< HEAD
         {isAuctionEnded && canClaim() && !currentAuctionState?.ended && (
           <button className="btn btn-success btn-sm" onClick={handleClaimNFT} disabled={isClaimLoading}>
             {isClaimLoading ? "Claiming..." : "Claim NFT"}
+=======
+          <button
+            className={`btn btn-primary w-full`}
+            onClick={handlePlaceBid}
+            disabled={Date.now() / 1000 > auction.endTime || auction.ended}
+          >
+            {"Place Bid"}
+            {(Date.now() / 1000 > auction.endTime || auction.ended) && " (Auction Ended)"}
+>>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
           </button>
         )}
 
+<<<<<<< HEAD
         {isAuctionEnded && currentAuctionState?.ended && (
           <div className="text-center text-success font-bold">NFT Claimed</div>
         )}
@@ -225,6 +278,30 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
         {auction.seller.toLowerCase() === connectedAddress?.toLowerCase() && (
           <div className="text-center text-info text-xs">You are the seller</div>
         )}
+=======
+          <button
+            className={`btn btn-primary w-full`}
+            onClick={handleClaimNFT}
+            disabled={Date.now() / 1000 < auction.endTime}
+          >
+            {"Claim NFT"}
+          </button>
+
+          {/* Seller Withdraw Button - Only show if user is seller and no bids */}
+          {isSeller && canWithdraw && (
+            <button className="btn btn-warning w-full" onClick={handleWithdrawAuction} disabled={auction.ended}>
+              Withdraw Auction
+            </button>
+          )}
+
+          {/* Owner Emergency Withdraw Button - Only show if user is owner */}
+          {isOwner && (
+            <button className="btn btn-error w-full" onClick={handleEmergencyWithdraw} disabled={auction.ended}>
+              Emergency Withdraw
+            </button>
+          )}
+        </div>
+>>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
       </div>
     </div>
   );

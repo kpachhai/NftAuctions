@@ -14,6 +14,11 @@ const BlockExplorer: NextPage = () => {
   const [isLocalNetwork, setIsLocalNetwork] = useState(true);
   const [hasError, setHasError] = useState(false);
 
+  // Check if there are any transactions across all blocks
+  const hasTransactions = blocks.some(
+    block => block.transactions && Array.isArray(block.transactions) && block.transactions.length > 0,
+  );
+
   useEffect(() => {
     if (targetNetwork.id !== hardhat.id) {
       setIsLocalNetwork(false);
@@ -75,7 +80,12 @@ const BlockExplorer: NextPage = () => {
     <div className="container mx-auto my-10">
       <SearchBar />
       <TransactionsTable blocks={blocks} transactionReceipts={transactionReceipts} />
-      <PaginationButton currentPage={currentPage} totalItems={Number(totalBlocks)} setCurrentPage={setCurrentPage} />
+      <PaginationButton
+        currentPage={currentPage}
+        totalItems={Number(totalBlocks)}
+        setCurrentPage={setCurrentPage}
+        hasTransactions={hasTransactions}
+      />
     </div>
   );
 };

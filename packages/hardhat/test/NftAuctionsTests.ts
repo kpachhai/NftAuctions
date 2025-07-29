@@ -420,6 +420,7 @@ describe("NftAuctions", function () {
     });
   });
 
+<<<<<<< HEAD
   describe("getExpiredAuctions", function () {
     it("Should return expired auctions", async function () {
       await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
@@ -433,4 +434,115 @@ describe("NftAuctions", function () {
       expect(expiredAuctions[0].auctionId).to.equal(0);
     });
   });
+=======
+  describe("Withdrawal Functionality", function () {
+    beforeEach(async function () {
+      await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
+      await nftAuctions.connect(seller).createAuction(mockERC721Address, tokenId, startingPrice, duration);
+    });
+
+    describe("Seller Withdrawal", function () {
+      it("Should allow seller to withdraw before any bids", async function () {
+        const tx = await nftAuctions.connect(seller).withdrawAuction(0);
+
+        await expect(tx).to.emit(nftAuctions, "AuctionWithdrawn").withArgs(0, seller.address);
+
+        // Verify NFT is returned to seller
+        expect(await yourCollectible.ownerOf(tokenId)).to.equal(seller.address);
+
+        // Verify auction is marked as ended
+        const auction = await nftAuctions.auctions(0);
+        expect(auction.ended).to.equal(true);
+      });
+
+      it("Should revert if non-seller tries to withdraw", async function () {
+        await expect(nftAuctions.connect(bidder1).withdrawAuction(0)).to.be.revertedWith("Only seller can withdraw");
+      });
+
+      it("Should revert if seller tries to withdraw after bids", async function () {
+        // Place a bid first
+        await nftAuctions.connect(bidder1).placeBid(0, { value: startingPrice });
+
+        // Try to withdraw after bid
+        await expect(nftAuctions.connect(seller).withdrawAuction(0)).to.be.revertedWith("Cannot withdraw after bids");
+      });
+
+      it("Should revert if auction doesn't exist", async function () {
+        await expect(nftAuctions.connect(seller).withdrawAuction(999)).to.be.revertedWith("Auction does not exist");
+      });
+
+      it("Should revert if auction already ended", async function () {
+        // End the auction first
+        await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
+        await ethers.provider.send("evm_mine", []);
+        await nftAuctions.connect(owner).endAuction(0);
+
+        // Try to withdraw ended auction
+        await expect(nftAuctions.connect(seller).withdrawAuction(0)).to.be.revertedWith("Auction already ended");
+      });
+    });
+
+    describe("Emergency Withdrawal", function () {
+      it("Should allow owner to emergency withdraw before bids", async function () {
+        const tx = await nftAuctions.connect(owner).emergencyWithdraw(0);
+
+        await expect(tx).to.emit(nftAuctions, "AuctionCancelled").withArgs(0, seller.address, ethers.ZeroAddress);
+
+        // Verify NFT is returned to seller
+        expect(await yourCollectible.ownerOf(tokenId)).to.equal(seller.address);
+
+        // Verify auction is marked as ended
+        const auction = await nftAuctions.auctions(0);
+        expect(auction.ended).to.equal(true);
+      });
+
+      it("Should allow owner to emergency withdraw after bids", async function () {
+        const bidAmount = ethers.parseEther("1.5");
+        await nftAuctions.connect(bidder1).placeBid(0, { value: bidAmount });
+
+        const bidderBalanceBefore = await ethers.provider.getBalance(bidder1.address);
+
+        const tx = await nftAuctions.connect(owner).emergencyWithdraw(0);
+
+        await expect(tx).to.emit(nftAuctions, "AuctionCancelled").withArgs(0, seller.address, bidder1.address);
+
+        // Verify NFT is returned to seller
+        expect(await yourCollectible.ownerOf(tokenId)).to.equal(seller.address);
+
+        // Verify bidder gets refund
+        const bidderBalanceAfter = await ethers.provider.getBalance(bidder1.address);
+        expect(bidderBalanceAfter).to.be.greaterThan(bidderBalanceBefore + bidAmount - ethers.parseEther("0.01"));
+        expect(bidderBalanceAfter).to.be.lessThan(bidderBalanceBefore + bidAmount + ethers.parseEther("0.01"));
+
+        // Verify auction is marked as ended
+        const auction = await nftAuctions.auctions(0);
+        expect(auction.ended).to.equal(true);
+      });
+
+      it("Should revert if non-owner tries to emergency withdraw", async function () {
+        await expect(nftAuctions.connect(seller).emergencyWithdraw(0)).to.be.revertedWithCustomError(
+          nftAuctions,
+          "OwnableUnauthorizedAccount",
+        );
+      });
+
+      it("Should revert if emergency withdraw on non-existent auction", async function () {
+        await expect(nftAuctions.connect(owner).emergencyWithdraw(999)).to.be.revertedWith("Auction does not exist");
+      });
+
+      it("Should revert if emergency withdraw on already ended auction", async function () {
+        // End the auction first
+        await ethers.provider.send("evm_increaseTime", [duration * 60 + 1]);
+        await ethers.provider.send("evm_mine", []);
+        await nftAuctions.connect(owner).endAuction(0);
+
+        // Try to emergency withdraw ended auction
+        await expect(nftAuctions.connect(owner).emergencyWithdraw(0)).to.be.revertedWith("Auction already ended");
+      });
+    });
+  });
+
+  // Helper for anyValue matcher
+  const anyValue = () => true;
+>>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
 });

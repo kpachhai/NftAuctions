@@ -89,6 +89,7 @@ export const ContractTabs = ({ address, contractData }: PageProps) => {
             currentPage={currentPage}
             totalItems={Number(totalBlocks)}
             setCurrentPage={setCurrentPage}
+            hasTransactions={filteredBlocks.length > 0}
           />
         </div>
       )}

@@ -49,6 +49,10 @@ contract NftAuctions is Ownable, ReentrancyGuard {
 
     event RoyaltyPaid(uint256 auctionId, address indexed receiver, uint256 royaltyAmount);
 
+    event AuctionWithdrawn(uint256 auctionId, address indexed seller);
+
+    event AuctionCancelled(uint256 auctionId, address indexed seller, address indexed highestBidder);
+
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     receive() external payable {}
@@ -99,6 +103,7 @@ contract NftAuctions is Ownable, ReentrancyGuard {
     function placeBid(uint256 _auctionId) external payable nonReentrant {
         Auction storage auction = auctions[_auctionId];
         require(auction.seller != address(0), "Auction does not exist");
+        require(!auction.ended, "Auction ended");
         require(block.timestamp < auction.endTime, "Auction ended");
         require(msg.value > auction.highestBid, "Bid too low");
         require(!auction.ended, "Auction already ended");
@@ -251,6 +256,7 @@ gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highe
         return expired;
     }
 
+<<<<<<< HEAD
     function cleanupExpiredAuctions() external {
         for (uint256 i = ongoingAuctionIds.length; i > 0; i--) {
             uint256 auctionId = ongoingAuctionIds[i - 1];
@@ -258,5 +264,38 @@ gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highe
                 _moveToExpired(auctionId);
             }
         }
+=======
+    function withdrawAuction(uint256 _auctionId) external nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.seller != address(0), "Auction does not exist");
+        require(msg.sender == auction.seller, "Only seller can withdraw");
+        require(!auction.ended, "Auction already ended");
+        require(auction.highestBidder == address(0), "Cannot withdraw after bids");
+
+        auction.ended = true;
+
+        // Return NFT to seller
+        auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
+
+        emit AuctionWithdrawn(_auctionId, auction.seller);
+    }
+
+    function emergencyWithdraw(uint256 _auctionId) external onlyOwner nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.seller != address(0), "Auction does not exist");
+        require(!auction.ended, "Auction already ended");
+
+        auction.ended = true;
+
+        // Return NFT to seller
+        auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
+
+        // Refund highest bidder if any
+        if (auction.highestBidder != address(0)) {
+            payable(auction.highestBidder).transfer(auction.highestBid);
+        }
+
+        emit AuctionCancelled(_auctionId, auction.seller, auction.highestBidder);
+>>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
     }
 }
