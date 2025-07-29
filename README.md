@@ -17,6 +17,49 @@
 
 ![Debug Contracts tab](https://github.com/scaffold-eth/scaffold-eth-2/assets/55535804/b237af0c-5027-4849-a5c1-2e31495cccb1)
 
+## 🎯 NFT Auction Features
+
+This project extends Scaffold-ETH 2 with a comprehensive NFT auction system featuring:
+
+### 🏆 **Auction Management**
+- **Create Auctions**: List NFTs for auction with custom duration and starting price
+- **Place Bids**: Competitive bidding system with automatic refunds for outbid users
+- **End Auctions**: Automatic auction conclusion with NFT transfer and payment distribution
+- **Royalty Support**: EIP-2981 compliant royalty payments to NFT creators
+- **Withdrawal Functions**: 
+  - **Seller Withdrawal**: Sellers can withdraw auctions before any bids are placed
+  - **Emergency Withdrawal**: Contract owner can emergency stop any auction
+
+### 💰 **Royalty System**
+- **EIP-2981 Compliance**: Automatic royalty detection and payment
+- **Creator Payments**: Royalties are automatically paid to NFT creators
+- **Flexible Royalty**: Supports any royalty percentage set by the NFT contract
+- **Fallback Handling**: Gracefully handles NFTs without royalty support
+
+### 🔧 **Blockchain Configuration**
+- **Auto-Mining**: Configured for 10-second block intervals to support time-based auction logic
+- **Transaction Visibility**: Enhanced block explorer with detailed transaction effects
+- **Empty State Handling**: Improved UI for when no transactions exist
+
+### 🎨 **User Interface Enhancements**
+- **Auction Cards**: Rich display of auction information with countdown timers
+- **Access Control**: UI buttons only show for authorized users (seller/owner)
+- **Transaction Effects**: Block explorer shows what each transaction accomplished
+- **Responsive Design**: Mobile-friendly auction interface
+- **Real-time Updates**: Live auction status and bid updates
+
+### 🛡️ **Security Features**
+- **Reentrancy Protection**: All auction functions protected against reentrancy attacks
+- **Access Control**: Proper authorization checks for withdrawal functions
+- **State Validation**: Prevents bidding on withdrawn or ended auctions
+- **Error Handling**: Comprehensive error messages and validation
+
+### 📊 **Block Explorer Improvements**
+- **Transaction Effects**: Shows "NFT Transfer", "Royalty Paid", "Auction Ended" badges
+- **Empty State Handling**: Better UX when no transactions exist
+- **Pagination**: Only shows blocks with actual transactions
+- **Real-time Updates**: Live transaction monitoring
+
 ## Requirements
 
 Before you begin, you need to install the following tools:
