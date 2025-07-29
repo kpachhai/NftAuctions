@@ -5,6 +5,11 @@ import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+// EIP-2981 Royalty Interface
+interface IERC2981 {
+    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
+}
+
 contract NftAuctions is Ownable, ReentrancyGuard {
     struct Auction {
         uint256 auctionId;
@@ -42,6 +47,8 @@ contract NftAuctions is Ownable, ReentrancyGuard {
 
     event AuctionEnded(uint256 auctionId, address indexed winner, uint256 winningBid);
 
+    event RoyaltyPaid(uint256 auctionId, address indexed receiver, uint256 royaltyAmount);
+
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     receive() external payable {}
@@ -64,7 +71,7 @@ contract NftAuctions is Ownable, ReentrancyGuard {
             auctionId: auctionId,
             seller: msg.sender,
             highestBidder: address(0),
-            highestBid: _startingPriceWei,
+            highestBid: 0, // Initialize to 0, not starting price
             startTime: block.timestamp,
             endTime: endTime,
             startingPrice: _startingPriceWei,
@@ -119,8 +126,27 @@ contract NftAuctions is Ownable, ReentrancyGuard {
 
         if (auction.highestBidder != address(0)) {
             auction.nftContract.transferFrom(address(this), auction.highestBidder, auction.tokenId);
-            payable(auction.seller).transfer(auction.highestBid);
-            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
+            
+            // Handle royalties if the NFT contract supports EIP-2981
+            try IERC2981(address(auction.nftContract)).royaltyInfo(auction.tokenId, auction.highestBid) returns (address receiver, uint256 royaltyAmount) {
+                if (royaltyAmount > 0 && receiver != address(0)) {
+                    // Pay royalty to the receiver
+                    payable(receiver).transfer(royaltyAmount);
+                    emit RoyaltyPaid(_auctionId, receiver, royaltyAmount);
+                    
+                    // Pay remaining amount to seller
+                    uint256 sellerAmount = auction.highestBid - royaltyAmount;
+                    payable(auction.seller).transfer(sellerAmount);
+                } else {
+                    // No royalty, pay full amount to seller
+                    payable(auction.seller).transfer(auction.highestBid);
+                }
+            } catch {
+                // NFT contract doesn't support EIP-2981, pay full amount to seller
+                payable(auction.seller).transfer(auction.highestBid);
+            }
+            
+gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
         } else {
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
             emit AuctionEnded(_auctionId, address(0), 0);
@@ -153,6 +179,15 @@ contract NftAuctions is Ownable, ReentrancyGuard {
 
         expiredAuctionIndex[_auctionId] = expiredAuctionIds.length;
         expiredAuctionIds.push(_auctionId);
+    }
+
+    // Helper function to get royalty info
+    function getRoyaltyInfo(address nftContract, uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount) {
+        try IERC2981(nftContract).royaltyInfo(tokenId, salePrice) returns (address _receiver, uint256 _royaltyAmount) {
+            return (_receiver, _royaltyAmount);
+        } catch {
+            return (address(0), 0);
+        }
     }
 
     function getAuction(uint256 _auctionId) external view returns (Auction memory) {
