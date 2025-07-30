@@ -27,7 +27,8 @@
     "@typechain/ethers-v6": "~0.5.1",
     "dotenv": "~16.4.5",
     "envfile": "~7.1.0",
-    "qrcode": "~1.5.4"
+    "qrcode": "~1.5.4",
+    "sinon": "^21.0.0"
   },
   "devDependencies": {
     "@ethersproject/abi": "~5.7.0",
@@ -42,6 +43,7 @@
     "@types/mocha": "~10.0.10",
     "@types/prettier": "~3.0.0",
     "@types/qrcode": "~1.5.5",
+    "@types/sinon": "^17.0.4",
     "@typescript-eslint/eslint-plugin": "~8.27.0",
     "@typescript-eslint/parser": "~8.27.0",
     "chai": "~4.5.0",

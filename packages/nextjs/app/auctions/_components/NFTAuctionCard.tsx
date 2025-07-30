@@ -1,10 +1,15 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { Auction } from "./Auctions";
-import { parseGwei } from "viem";
+import { formatEther, parseGwei } from "viem";
+import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { Auction } from "~~/types/nft";
+import { notification } from "~~/utils/scaffold-eth";
 
 export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
+  const { address: connectedAddress } = useAccount();
   const [bidAmount, setBidAmount] = useState("");
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
@@ -12,58 +17,83 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
     seconds: 0,
     ended: false,
   });
+  const [isClaimLoading, setIsClaimLoading] = useState(false);
+  const [isBidLoading, setIsBidLoading] = useState(false);
 
   const { writeContractAsync: placeBidAsync } = useScaffoldWriteContract({
     contractName: "NftAuctions",
   });
 
-  // Optional: Fetch current highest bid to validate against
-  const { data: currentHighestBid } = useScaffoldReadContract({
+  const { writeContractAsync: endAuctionAsync } = useScaffoldWriteContract({
+    contractName: "NftAuctions",
+  });
+
+  const { data: currentAuctionState, refetch: refetchAuctionState } = useScaffoldReadContract({
     contractName: "NftAuctions",
     functionName: "getAuction",
-    args: [BigInt(auction.auctionId)],
+    args: [auction.auctionId],
+    watch: true,
   });
 
   const handlePlaceBid = async () => {
     if (!bidAmount) {
+      notification.error("Please enter a bid amount");
       return;
     }
 
     const bidAmountInWei = parseGwei(bidAmount);
-    const minBid = currentHighestBid?.highestBid || auction.startingPrice;
+    const minBid = currentAuctionState?.highestBid || auction.startingPrice;
 
     if (bidAmountInWei <= minBid) {
+      notification.error(`Bid must be higher than ${formatEther(minBid)} ETH`);
       return;
     }
 
+    setIsBidLoading(true);
     try {
       await placeBidAsync({
         functionName: "placeBid",
-        args: [BigInt(auction.auctionId)],
+        args: [auction.auctionId],
         value: bidAmountInWei,
       });
-      // Success - you might want to add toast notification here
+      notification.success("Bid placed successfully!");
       setBidAmount("");
     } catch (err: any) {
       console.error("Bid placement failed:", err);
+      notification.error("Failed to place bid");
+    } finally {
+      setIsBidLoading(false);
     }
   };
 
   const handleClaimNFT = async () => {
+    setIsClaimLoading(true);
     try {
-      await placeBidAsync({
+      const now = Math.floor(Date.now() / 1000); // Current time in seconds
+      const endTime = Number(currentAuctionState?.endTime || auction.endTime);
+
+      if (now < endTime) {
+        throw new Error("Auction has not yet ended");
+      }
+
+      await endAuctionAsync({
         functionName: "endAuction",
-        args: [BigInt(auction.auctionId)],
+        args: [auction.auctionId],
       });
+      notification.success("NFT claimed successfully!");
     } catch (err: any) {
       console.error("Claim NFT failed:", err);
+      notification.error("Failed to claim NFT: " + (err.message || "Unknown error"));
+    } finally {
+      setIsClaimLoading(false);
+      refetchAuctionState();
     }
   };
 
   useEffect(() => {
     const updateCountdown = () => {
       const now = Math.floor(Date.now() / 1000);
-      const endTime = Number(auction.endTime);
+      const endTime = Number(currentAuctionState?.endTime || auction.endTime);
       const totalSeconds = Math.max(0, endTime - now);
 
       if (totalSeconds <= 0) {
@@ -73,6 +103,7 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
           seconds: 0,
           ended: true,
         });
+        refetchAuctionState(); // Fetch the latest auction state once the countdown ends
         return;
       }
 
@@ -88,103 +119,112 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
       });
     };
 
-    // Update immediately
-    updateCountdown();
+    updateCountdown(); // Initial update
+    const interval = setInterval(updateCountdown, 1000); // Update every second
 
-    // Update every second
-    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [currentAuctionState?.endTime, auction.endTime, refetchAuctionState]);
 
-    return () => clearInterval(interval);
-  }, [auction.endTime]);
+  const canClaim = () => {
+    if (!connectedAddress || !currentAuctionState) return false;
+
+    const highestBidder = currentAuctionState.highestBidder || auction.highestBidder;
+    const seller = auction.seller;
+
+    return (
+      connectedAddress.toLowerCase() === highestBidder?.toLowerCase() ||
+      (connectedAddress.toLowerCase() === seller.toLowerCase() &&
+        (!highestBidder || highestBidder === "0x0000000000000000000000000000000000000000"))
+    );
+  };
+
+  const isAuctionEnded = timeRemaining.ended || currentAuctionState?.ended || auction.ended;
+  const currentHighestBid = currentAuctionState?.highestBid || auction.highestBid;
+  const currentHighestBidder = currentAuctionState?.highestBidder || auction.highestBidder;
 
   return (
     <div className="card card-compact bg-base-100 shadow-lg w-[325px] shadow-secondary">
       <figure className="relative">
-        <img src={auction.image} alt="NFT Image" className="h-60 min-w-full" />
+        <img src={auction.image} alt="NFT Image" className="h-60 min-w-full object-cover" />
         <figcaption className="glass absolute bottom-4 left-4 p-4 rounded-xl">
-          <span className="text-white"># {auction.tokenId}</span>
+          <span className="text-white">#{auction.tokenId.toString()}</span>
         </figcaption>
+        {isAuctionEnded && <div className="absolute top-4 right-4 badge badge-error">ENDED</div>}
       </figure>
+
       <div className="card-body space-y-3">
         <div className="flex items-center justify-center">
-          <p className="text-xl p-0 m-0 font-semibold">{auction.name}</p>
-          <div className="flex flex-wrap space-x-2 mt-1">
-            {auction.attributes?.map((attr, index) => (
-              <span key={index} className="badge badge-primary px-1.5">
-                {attr.value}
-              </span>
-            ))}
+          <div className="flex flex-col text-center">
+            <span className="text-lg font-bold">{auction.name}</span>
+            <span className="text-base-content text-xs">
+              Seller: <Address address={auction.seller} size="xs" />
+            </span>
           </div>
         </div>
 
-        <div className="flex flex-col justify-center mt-1 space-y-4">
-          <div className="flex gap-2 items-center">
-            <span className="font-semibold min-w-[120px]">Auction ID:</span>
-            <span>{auction.auctionId}</span>
+        <div className="flex justify-between">
+          <div className="text-sm">
+            <span className="text-base-content/70">Starting Price:</span>
+            <br />
+            <span className="font-bold">{formatEther(auction.startingPrice)} ETH</span>
           </div>
-          <div className="flex gap-2 items-center">
-            <span className="font-semibold min-w-[120px]">Seller:</span>
-            <Address address={auction.seller} />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="font-semibold min-w-[120px]">Highest Bidder:</span>
-            <Address address={auction.highestBidder} />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="font-semibold min-w-[120px]">Current Bid:</span>
-            <span>{(auction.highestBid / BigInt(1e9)).toString()} Gwei</span>
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="font-semibold min-w-[120px]">Starting Price:</span>
-            <span>{(auction.startingPrice / BigInt(1e9)).toString()} Gwei</span>
+          <div className="text-sm text-right">
+            <span className="text-base-content/70">Current Bid:</span>
+            <br />
+            <span className="font-bold">{formatEther(currentHighestBid)} ETH</span>
           </div>
         </div>
+
+        {currentHighestBidder && currentHighestBidder !== "0x0000000000000000000000000000000000000000" && (
+          <div className="text-sm text-center">
+            <span className="text-base-content/70">Highest Bidder:</span>
+            <br />
+            <Address address={currentHighestBidder} size="xs" />
+          </div>
+        )}
 
         <div className="text-center">
-          <span className="font-semibold">Time Remaining: </span>
-          {timeRemaining.ended ? (
-            <span className="text-error">Auction Ended</span>
+          {isAuctionEnded ? (
+            <div className="text-error font-bold">Auction Ended</div>
           ) : (
-            <span>
-              {timeRemaining.hours.toString().padStart(2, "0")}:{timeRemaining.minutes.toString().padStart(2, "0")}:
-              {timeRemaining.seconds.toString().padStart(2, "0")}
-            </span>
+            <div className="text-success font-bold">
+              {" "}
+              {/* Updated color to make it more visible */}
+              Time Remaining: {timeRemaining.hours}h {timeRemaining.minutes}m {timeRemaining.seconds}s
+            </div>
           )}
         </div>
 
-        <div className="mt-4 space-y-2">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Your Bid (Gwei)</span>
-            </label>
+        {!isAuctionEnded && connectedAddress && auction.seller.toLowerCase() !== connectedAddress.toLowerCase() && (
+          <div className="flex flex-col gap-2">
             <input
               type="number"
-              step="1"
-              min={(Number(auction.highestBid) / 10 ** 9 + 1).toString()}
-              placeholder={`Min: ${(Number(auction.highestBid) / 10 ** 9 + 1).toString()} Gwei`}
-              className="input input-bordered w-full"
+              step="0.001"
+              min="0"
+              placeholder="Bid amount (Gwei)"
+              className="input input-bordered input-sm"
               value={bidAmount}
               onChange={e => setBidAmount(e.target.value)}
             />
+            <button className="btn btn-primary btn-sm" onClick={handlePlaceBid} disabled={isBidLoading || !bidAmount}>
+              {isBidLoading ? "Placing Bid..." : "Place Bid"}
+            </button>
           </div>
+        )}
 
-          <button
-            className={`btn btn-primary w-full`}
-            onClick={handlePlaceBid}
-            disabled={Date.now() / 1000 > auction.endTime}
-          >
-            {"Place Bid"}
-            {Date.now() / 1000 > auction.endTime && " (Auction Ended)"}
+        {isAuctionEnded && canClaim() && !currentAuctionState?.ended && (
+          <button className="btn btn-success btn-sm" onClick={handleClaimNFT} disabled={isClaimLoading}>
+            {isClaimLoading ? "Claiming..." : "Claim NFT"}
           </button>
+        )}
 
-          <button
-            className={`btn btn-primary w-full`}
-            onClick={handleClaimNFT}
-            disabled={Date.now() / 1000 < auction.endTime}
-          >
-            {"Claim NFT"}
-          </button>
-        </div>
+        {isAuctionEnded && currentAuctionState?.ended && (
+          <div className="text-center text-success font-bold">NFT Claimed</div>
+        )}
+
+        {auction.seller.toLowerCase() === connectedAddress?.toLowerCase() && (
+          <div className="text-center text-info text-xs">You are the seller</div>
+        )}
       </div>
     </div>
   );
