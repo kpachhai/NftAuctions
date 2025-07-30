@@ -25,6 +25,12 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
     mapping(uint256 => Auction) public auctions;
     uint256 public auctionCount;
 
+    // Efficient storage for ongoing and expired auctions
+    uint256[] public ongoingAuctionIds;
+    uint256[] public expiredAuctionIds;
+    mapping(uint256 => uint256) public ongoingAuctionIndex;
+    mapping(uint256 => uint256) public expiredAuctionIndex;
+
     event AuctionCreated(
         uint256 indexed auctionId,
         address indexed seller,
@@ -39,7 +45,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
     event AuctionEnded(uint256 auctionId, address indexed winner, uint256 winningBid);
 
-    constructor(address initialOwner) ERC20("NftAutions", "MTK") ERC20Permit("NftAutions") Ownable(initialOwner) {}
+    constructor(address initialOwner) ERC20("NftAuctions", "NFTA") ERC20Permit("NftAuctions") Ownable(initialOwner) {}
 
     receive() external payable {}
 
@@ -47,24 +53,31 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
         IERC721 _nftContract,
         uint256 _tokenId,
         uint256 _startingPriceWei,
-        uint256 _durationMinutes
+        uint256 _durationSeconds
     ) external nonReentrant {
         require(_startingPriceWei > 0, "Starting price must be > 0");
+        require(_durationSeconds > 0, "Duration must be > 0");
+
         _nftContract.transferFrom(msg.sender, address(this), _tokenId);
 
         uint256 auctionId = auctionCount;
+        uint256 endTime = block.timestamp + _durationSeconds;
+
         auctions[auctionId] = Auction({
             auctionId: auctionId,
             seller: msg.sender,
             highestBidder: address(0),
             highestBid: _startingPriceWei,
             startTime: block.timestamp,
-            endTime: block.timestamp + _durationMinutes * 1 minutes,
+            endTime: endTime,
             startingPrice: _startingPriceWei,
             nftContract: _nftContract,
             tokenId: _tokenId,
             ended: false
         });
+
+        ongoingAuctionIndex[auctionId] = ongoingAuctionIds.length;
+        ongoingAuctionIds.push(auctionId);
 
         emit AuctionCreated(
             auctionId,
@@ -73,7 +86,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             _tokenId,
             _startingPriceWei,
             block.timestamp,
-            block.timestamp + _durationMinutes * 1 minutes
+            endTime
         );
 
         auctionCount += 1;
@@ -84,8 +97,8 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
         require(auction.seller != address(0), "Auction does not exist");
         require(block.timestamp < auction.endTime, "Auction ended");
         require(msg.value > auction.highestBid, "Bid too low");
+        require(!auction.ended, "Auction already ended");
 
-        // Refund previous bidder
         if (auction.highestBidder != address(0)) {
             payable(auction.highestBidder).transfer(auction.highestBid);
         }
@@ -98,20 +111,51 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
     function endAuction(uint256 _auctionId) external nonReentrant {
         Auction storage auction = auctions[_auctionId];
+        require(auction.seller != address(0), "Auction does not exist");
         require(block.timestamp >= auction.endTime, "Auction not ended yet");
         require(!auction.ended, "Auction already ended");
 
+        // Anyone can end an expired auction, but we'll track who can claim
         auction.ended = true;
 
+        _moveToExpired(_auctionId);
+
         if (auction.highestBidder != address(0)) {
-            // Transfer NFT to the highest bidder
             auction.nftContract.transferFrom(address(this), auction.highestBidder, auction.tokenId);
             payable(auction.seller).transfer(auction.highestBid);
             emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
         } else {
-            // No bids were placed, return NFT to the seller
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
+            emit AuctionEnded(_auctionId, address(0), 0);
         }
+    }
+
+    // New function to check if auction is expired (can be ended)
+    function isAuctionExpired(uint256 _auctionId) external view returns (bool) {
+        Auction memory auction = auctions[_auctionId];
+        return auction.seller != address(0) && block.timestamp >= auction.endTime && !auction.ended;
+    }
+
+    // New function to get current blockchain timestamp
+    function getCurrentTime() external view returns (uint256) {
+        return block.timestamp;
+    }
+
+    function _moveToExpired(uint256 _auctionId) internal {
+        uint256 indexToRemove = ongoingAuctionIndex[_auctionId];
+        uint256 lastIndex = ongoingAuctionIds.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            uint256 lastAuctionId = ongoingAuctionIds[lastIndex];
+            ongoingAuctionIds[indexToRemove] = lastAuctionId;
+            ongoingAuctionIndex[lastAuctionId] = indexToRemove;
+        }
+
+        ongoingAuctionIds.pop();
+        delete ongoingAuctionIndex[_auctionId];
+
+        expiredAuctionIndex[_auctionId] = expiredAuctionIds.length;
+        expiredAuctionIds.push(_auctionId);
     }
 
     function getAuction(uint256 _auctionId) external view returns (Auction memory) {
@@ -119,38 +163,68 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
     }
 
     function getOngoingAuctions() external view returns (Auction[] memory) {
-        Auction[] memory ongoing = new Auction[](auctionCount);
         uint256 count = 0;
 
-        for (uint256 i = 0; i < auctionCount; i++) {
-            if (!auctions[i].ended && block.timestamp < auctions[i].endTime) {
-                ongoing[count] = auctions[i];
+        for (uint256 i = 0; i < ongoingAuctionIds.length; i++) {
+            uint256 auctionId = ongoingAuctionIds[i];
+            if (!auctions[auctionId].ended && block.timestamp < auctions[auctionId].endTime) {
                 count++;
             }
         }
 
-        assembly {
-            mstore(ongoing, count)
+        Auction[] memory ongoing = new Auction[](count);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < ongoingAuctionIds.length; i++) {
+            uint256 auctionId = ongoingAuctionIds[i];
+            if (!auctions[auctionId].ended && block.timestamp < auctions[auctionId].endTime) {
+                ongoing[index] = auctions[auctionId];
+                index++;
+            }
         }
 
         return ongoing;
     }
 
     function getExpiredAuctions() external view returns (Auction[] memory) {
-        Auction[] memory expired = new Auction[](auctionCount);
         uint256 count = 0;
 
-        for (uint256 i = 0; i < auctionCount; i++) {
-            if (auctions[i].ended || block.timestamp >= auctions[i].endTime) {
-                expired[count] = auctions[i];
+        for (uint256 i = 0; i < ongoingAuctionIds.length; i++) {
+            uint256 auctionId = ongoingAuctionIds[i];
+            if (auctions[auctionId].ended || block.timestamp >= auctions[auctionId].endTime) {
                 count++;
             }
         }
 
-        assembly {
-            mstore(expired, count)
+        for (uint256 i = 0; i < expiredAuctionIds.length; i++) {
+            count++;
+        }
+
+        Auction[] memory expired = new Auction[](count);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < ongoingAuctionIds.length; i++) {
+            uint256 auctionId = ongoingAuctionIds[i];
+            if (auctions[auctionId].ended || block.timestamp >= auctions[auctionId].endTime) {
+                expired[index] = auctions[auctionId];
+                index++;
+            }
+        }
+
+        for (uint256 i = 0; i < expiredAuctionIds.length; i++) {
+            expired[index] = auctions[expiredAuctionIds[i]];
+            index++;
         }
 
         return expired;
+    }
+
+    function cleanupExpiredAuctions() external {
+        for (uint256 i = ongoingAuctionIds.length; i > 0; i--) {
+            uint256 auctionId = ongoingAuctionIds[i - 1];
+            if (block.timestamp >= auctions[auctionId].endTime && !auctions[auctionId].ended) {
+                _moveToExpired(auctionId);
+            }
+        }
     }
 }

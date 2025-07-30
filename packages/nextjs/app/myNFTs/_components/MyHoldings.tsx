@@ -4,15 +4,9 @@ import { useEffect, useState } from "react";
 import { NFTCard } from "./NFTCard";
 import { useAccount } from "wagmi";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { Collectible } from "~~/types/nft";
 import { notification } from "~~/utils/scaffold-eth";
 import { getMetadataFromIPFS } from "~~/utils/simpleNFT/ipfs-fetch";
-import { NFTMetaData } from "~~/utils/simpleNFT/nftsMetadata";
-
-export interface Collectible extends Partial<NFTMetaData> {
-  id: number;
-  uri: string;
-  owner: string;
-}
 
 export const MyHoldings = () => {
   const { address: connectedAddress } = useAccount();
@@ -38,6 +32,7 @@ export const MyHoldings = () => {
       setAllCollectiblesLoading(true);
       const collectibleUpdate: Collectible[] = [];
       const totalBalance = parseInt(myTotalBalance.toString());
+
       for (let tokenIndex = 0; tokenIndex < totalBalance; tokenIndex++) {
         try {
           const tokenId = await yourCollectibleContract.read.tokenOfOwnerByIndex([
@@ -46,10 +41,8 @@ export const MyHoldings = () => {
           ]);
 
           const tokenURI = await yourCollectibleContract.read.tokenURI([tokenId]);
-
           const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "");
-
-          const nftMetadata: NFTMetaData = await getMetadataFromIPFS(ipfsHash);
+          const nftMetadata = await getMetadataFromIPFS(ipfsHash);
 
           collectibleUpdate.push({
             id: parseInt(tokenId.toString()),
@@ -58,26 +51,26 @@ export const MyHoldings = () => {
             ...nftMetadata,
           });
         } catch (e) {
-          notification.error("Error fetching all collectibles");
-          setAllCollectiblesLoading(false);
-          console.log(e);
+          notification.error("Error fetching collectible");
+          console.error("Error fetching collectible:", e);
         }
       }
+
       collectibleUpdate.sort((a, b) => a.id - b.id);
       setMyAllCollectibles(collectibleUpdate);
       setAllCollectiblesLoading(false);
     };
 
     updateMyCollectibles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, myTotalBalance]);
 
-  if (allCollectiblesLoading)
+  if (allCollectiblesLoading) {
     return (
       <div className="flex justify-center items-center mt-10">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
+  }
 
   return (
     <>
