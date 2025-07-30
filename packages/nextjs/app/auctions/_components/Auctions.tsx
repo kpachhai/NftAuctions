@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NFTAuctionCard } from "./NFTAuctionCard";
 import { useAccount } from "wagmi";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
@@ -33,28 +33,31 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
     watch: true,
   });
 
-  const fetchAuctionData = async (auctionFromContract: any): Promise<Auction> => {
-    const tokenId = auctionFromContract.tokenId;
-    const tokenURI = await yourCollectibleContract!.read.tokenURI([tokenId]);
-    const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "").replace("ipfs://", "");
-    const nftMetadata = await getMetadataFromIPFS(ipfsHash);
+  const fetchAuctionData = useCallback(
+    async (auctionFromContract: any): Promise<Auction> => {
+      const tokenId = auctionFromContract.tokenId;
+      const tokenURI = await yourCollectibleContract!.read.tokenURI([tokenId]);
+      const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "").replace("ipfs://", "");
+      const nftMetadata = await getMetadataFromIPFS(ipfsHash);
 
-    return {
-      auctionId: auctionFromContract.auctionId,
-      tokenId: tokenId,
-      startingPrice: auctionFromContract.startingPrice,
-      duration: BigInt(Number(auctionFromContract.endTime) - Number(auctionFromContract.startTime)),
-      seller: auctionFromContract.seller,
-      uri: tokenURI,
-      highestBidder: auctionFromContract.highestBidder,
-      highestBid: auctionFromContract.highestBid,
-      startTime: auctionFromContract.startTime,
-      endTime: auctionFromContract.endTime,
-      nftContract: nftAuctionsContract!.address,
-      ended: auctionFromContract.ended,
-      ...nftMetadata,
-    };
-  };
+      return {
+        auctionId: auctionFromContract.auctionId,
+        tokenId: tokenId,
+        startingPrice: auctionFromContract.startingPrice,
+        duration: BigInt(Number(auctionFromContract.endTime) - Number(auctionFromContract.startTime)),
+        seller: auctionFromContract.seller,
+        uri: tokenURI,
+        highestBidder: auctionFromContract.highestBidder,
+        highestBid: auctionFromContract.highestBid,
+        startTime: auctionFromContract.startTime,
+        endTime: auctionFromContract.endTime,
+        nftContract: nftAuctionsContract!.address,
+        ended: auctionFromContract.ended,
+        ...nftMetadata,
+      };
+    },
+    [yourCollectibleContract, nftAuctionsContract],
+  );
 
   useEffect(() => {
     const updateAuctions = async (): Promise<void> => {
