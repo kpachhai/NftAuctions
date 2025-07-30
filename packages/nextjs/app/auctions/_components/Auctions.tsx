@@ -90,7 +90,7 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
     };
 
     updateAuctions();
-  }, [connectedAddress, auctionsFromContract]);
+  }, [connectedAddress, auctionsFromContract, fetchAuctionData, nftAuctionsContract, yourCollectibleContract]);
 
   if (auctionsLoading) {
     return (
