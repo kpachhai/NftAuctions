@@ -63,11 +63,22 @@ function getInheritedFunctions(sources: Record<string, any>, contractName: strin
     const sourcePath = Object.keys(sources).find(key => key.includes(`/${sourceContractName}`));
     if (sourcePath) {
       const sourceName = sourcePath?.split("/").pop()?.split(".sol")[0];
-      const { abi } = JSON.parse(fs.readFileSync(`${ARTIFACTS_DIR}/${sourcePath}/${sourceName}.json`).toString());
-      for (const functionAbi of abi) {
-        if (functionAbi.type === "function") {
-          inheritedFunctions[functionAbi.name] = sourcePath;
+      const artifactPath = `${ARTIFACTS_DIR}/${sourcePath}/${sourceName}.json`;
+
+      // Check if the artifact file exists before trying to read it
+      if (fs.existsSync(artifactPath)) {
+        try {
+          const { abi } = JSON.parse(fs.readFileSync(artifactPath).toString());
+          for (const functionAbi of abi) {
+            if (functionAbi.type === "function") {
+              inheritedFunctions[functionAbi.name] = sourcePath;
+            }
+          }
+        } catch (error) {
+          console.warn(`Warning: Could not read artifact for ${sourceName}: ${error}`);
         }
+      } else {
+        console.warn(`Warning: Artifact file not found: ${artifactPath}`);
       }
     }
   }
