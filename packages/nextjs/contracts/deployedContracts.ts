@@ -312,6 +312,13 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [],
+          name: "cleanupExpiredAuctions",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "contract IERC721",
@@ -612,6 +619,59 @@ const deployedContracts = {
               internalType: "struct NftAuctions.Auction[]",
               name: "",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "nftContract",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "tokenId",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "salePrice",
+              type: "uint256",
+            },
+          ],
+          name: "getRoyaltyInfo",
+          outputs: [
+            {
+              internalType: "address",
+              name: "receiver",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "royaltyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_auctionId",
+              type: "uint256",
+            },
+          ],
+          name: "isAuctionExpired",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
