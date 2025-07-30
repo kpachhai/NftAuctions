@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import sinon from "sinon";
 import { ethers } from "hardhat";
 import { NftAuctions, YourCollectible } from "../typechain-types";
 
@@ -51,8 +50,8 @@ describe("NftAuctions", function () {
         mockERC721Address,
         tokenId,
         startingPrice,
-        sinon.match.number, // startTime
-        sinon.match.number, // endTime
+        anyValue, // startTime
+        anyValue, // endTime
       );
 
       const auction = await nftAuctions.auctions(0);
@@ -420,7 +419,6 @@ describe("NftAuctions", function () {
     });
   });
 
-<<<<<<< HEAD
   describe("getExpiredAuctions", function () {
     it("Should return expired auctions", async function () {
       await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
@@ -434,7 +432,6 @@ describe("NftAuctions", function () {
       expect(expiredAuctions[0].auctionId).to.equal(0);
     });
   });
-=======
   describe("Withdrawal Functionality", function () {
     beforeEach(async function () {
       await yourCollectible.connect(seller).approve(nftAuctionsAddress, tokenId);
@@ -544,5 +541,4 @@ describe("NftAuctions", function () {
 
   // Helper for anyValue matcher
   const anyValue = () => true;
->>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
 });

@@ -150,8 +150,7 @@ contract NftAuctions is Ownable, ReentrancyGuard {
                 // NFT contract doesn't support EIP-2981, pay full amount to seller
                 payable(auction.seller).transfer(auction.highestBid);
             }
-            
-gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
+             emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
         } else {
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
             emit AuctionEnded(_auctionId, address(0), 0);
@@ -256,7 +255,6 @@ gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highe
         return expired;
     }
 
-<<<<<<< HEAD
     function cleanupExpiredAuctions() external {
         for (uint256 i = ongoingAuctionIds.length; i > 0; i--) {
             uint256 auctionId = ongoingAuctionIds[i - 1];
@@ -264,7 +262,8 @@ gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highe
                 _moveToExpired(auctionId);
             }
         }
-=======
+    }
+
     function withdrawAuction(uint256 _auctionId) external nonReentrant {
         Auction storage auction = auctions[_auctionId];
         require(auction.seller != address(0), "Auction does not exist");
@@ -296,6 +295,5 @@ gi            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highe
         }
 
         emit AuctionCancelled(_auctionId, auction.seller, auction.highestBidder);
->>>>>>> 2c086f0 (Add auction royalties and  withdrawal functions, make blockchain auto-mine and adjust UI to display relevant info)
     }
 }
