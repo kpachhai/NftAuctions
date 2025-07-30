@@ -50,16 +50,31 @@ const MyNFTs: NextPage = () => {
     try {
       const uploadedItem = await addToIPFS(currentTokenMetaData);
 
+      console.log("IPFS upload response:", uploadedItem);
+
+      // Check if the upload was successful and has the expected format
+      if (!uploadedItem || uploadedItem.error) {
+        throw new Error(uploadedItem?.error || "IPFS upload failed");
+      }
+
+      // The IPFS response should have a Hash property, not path
+      const ipfsHash = uploadedItem.Hash || uploadedItem.hash || uploadedItem.path;
+
+      if (!ipfsHash) {
+        throw new Error("No IPFS hash returned from upload");
+      }
+
       // First remove previous loading notification and then show success notification
       notification.remove(notificationId);
       notification.success("Metadata uploaded to IPFS");
 
       await writeContractAsync({
         functionName: "mintItem",
-        args: [connectedAddress, uploadedItem.path],
+        args: [connectedAddress, `ipfs://${ipfsHash}`],
       });
     } catch (error) {
       notification.remove(notificationId);
+      notification.error("Failed to upload to IPFS");
       console.error(error);
     }
   };
