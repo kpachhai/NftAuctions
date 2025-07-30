@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NFTAuctionCard } from "./NFTAuctionCard";
 import { useAccount } from "wagmi";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
@@ -18,6 +18,7 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
   const { address: connectedAddress } = useAccount();
   const [auctionsData, setAuctionsData] = useState<Auction[]>([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
+  const isProcessingRef = useRef(false);
 
   const { data: yourCollectibleContract } = useScaffoldContract({
     contractName: "YourCollectible",
@@ -34,9 +35,9 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
   });
 
   const fetchAuctionData = useCallback(
-    async (auctionFromContract: any): Promise<Auction> => {
+    async (auctionFromContract: any, yourCollectible: any, nftAuctions: any): Promise<Auction> => {
       const tokenId = auctionFromContract.tokenId;
-      const tokenURI = await yourCollectibleContract!.read.tokenURI([tokenId]);
+      const tokenURI = await yourCollectible.read.tokenURI([tokenId]);
       const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "").replace("ipfs://", "");
       const nftMetadata = await getMetadataFromIPFS(ipfsHash);
 
@@ -51,12 +52,12 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
         highestBid: auctionFromContract.highestBid,
         startTime: auctionFromContract.startTime,
         endTime: auctionFromContract.endTime,
-        nftContract: nftAuctionsContract!.address,
+        nftContract: nftAuctions.address,
         ended: auctionFromContract.ended,
         ...nftMetadata,
       };
     },
-    [yourCollectibleContract, nftAuctionsContract],
+    [],
   );
 
   useEffect(() => {
@@ -65,10 +66,12 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
         auctionsFromContract === undefined ||
         nftAuctionsContract === undefined ||
         yourCollectibleContract === undefined ||
-        connectedAddress === undefined
+        connectedAddress === undefined ||
+        isProcessingRef.current
       )
         return;
 
+      isProcessingRef.current = true;
       setAuctionsLoading(true);
 
       try {
@@ -76,7 +79,11 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
 
         for (let auctionIndex = 0; auctionIndex < auctionsFromContract.length; auctionIndex++) {
           try {
-            const auction = await fetchAuctionData(auctionsFromContract[auctionIndex]);
+            const auction = await fetchAuctionData(
+              auctionsFromContract[auctionIndex],
+              yourCollectibleContract,
+              nftAuctionsContract,
+            );
             updatedAuctionsData.push(auction);
           } catch (e) {
             console.error("Error fetching individual auction:", e);
@@ -89,11 +96,12 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
         console.error("Error fetching auctions:", e);
       } finally {
         setAuctionsLoading(false);
+        isProcessingRef.current = false;
       }
     };
 
     updateAuctions();
-  }, [connectedAddress, auctionsFromContract, fetchAuctionData, nftAuctionsContract, yourCollectibleContract]);
+  }, [auctionsFromContract, connectedAddress]);
 
   if (auctionsLoading) {
     return (
