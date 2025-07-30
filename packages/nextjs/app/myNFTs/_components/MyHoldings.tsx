@@ -62,7 +62,7 @@ export const MyHoldings = () => {
     };
 
     updateMyCollectibles();
-  }, [connectedAddress, myTotalBalance]);
+  }, [connectedAddress, myTotalBalance, yourCollectibleContract]);
 
   if (allCollectiblesLoading) {
     return (

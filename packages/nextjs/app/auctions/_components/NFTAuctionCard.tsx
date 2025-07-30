@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { formatEther, parseGwei } from "viem";
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
@@ -180,7 +181,13 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
   return (
     <div className="card card-compact bg-base-100 shadow-lg w-[325px] shadow-secondary">
       <figure className="relative">
-        <img src={auction.image} alt="NFT Image" className="h-60 min-w-full object-cover" />
+        <Image
+          src={auction.image || "/placeholder-nft.png"}
+          alt="NFT Image"
+          width={325}
+          height={240}
+          className="h-60 min-w-full object-cover"
+        />
         <figcaption className="glass absolute bottom-4 left-4 p-4 rounded-xl">
           <span className="text-white">#{auction.tokenId.toString()}</span>
         </figcaption>
