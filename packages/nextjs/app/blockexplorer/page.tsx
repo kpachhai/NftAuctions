@@ -31,23 +31,24 @@ const BlockExplorer: NextPage = () => {
     }
   }, [targetNetwork.id, error]);
 
+  // Only show notification for hardhat network - remove restrictions for other networks
   useEffect(() => {
-    if (!isLocalNetwork) {
-      notification.error(
+    if (!isLocalNetwork && targetNetwork.id !== hardhat.id) {
+      // Show informational message instead of error for non-local networks
+      notification.info(
         <>
-          <p className="font-bold mt-0 mb-1">
-            <code className="italic bg-base-300 text-base font-bold"> targetNetwork </code> is not localhost
-          </p>
+          <p className="font-bold mt-0 mb-1">Using external block explorer</p>
           <p className="m-0">
-            - You are on <code className="italic bg-base-300 text-base font-bold">{targetNetwork.name}</code> .This
-            block explorer is only for <code className="italic bg-base-300 text-base font-bold">localhost</code>.
-          </p>
-          <p className="mt-1 break-normal">
-            - You can use{" "}
-            <a className="text-accent" href={targetNetwork.blockExplorers?.default.url}>
+            You are on <code className="italic bg-base-300 text-base font-bold">{targetNetwork.name}</code>. For
+            complete transaction history, you can also use{" "}
+            <a
+              className="text-accent"
+              href={targetNetwork.blockExplorers?.default.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {targetNetwork.blockExplorers?.default.name}
-            </a>{" "}
-            instead
+            </a>
           </p>
         </>,
       );
@@ -57,6 +58,7 @@ const BlockExplorer: NextPage = () => {
     targetNetwork.blockExplorers?.default.name,
     targetNetwork.blockExplorers?.default.url,
     targetNetwork.name,
+    targetNetwork.id,
   ]);
 
   useEffect(() => {
@@ -78,14 +80,41 @@ const BlockExplorer: NextPage = () => {
 
   return (
     <div className="container mx-auto my-10">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">Block Explorer</h1>
+        <p className="text-sm text-gray-600">
+          Network: <span className="font-semibold">{targetNetwork.name}</span>
+          {!isLocalNetwork && (
+            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">External Network</span>
+          )}
+        </p>
+      </div>
       <SearchBar />
-      <TransactionsTable blocks={blocks} transactionReceipts={transactionReceipts} />
-      <PaginationButton
-        currentPage={currentPage}
-        totalItems={Number(totalBlocks)}
-        setCurrentPage={setCurrentPage}
-        hasTransactions={hasTransactions}
-      />
+      {!hasTransactions && !isLocalNetwork ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600 mb-4">
+            No local transactions found. This block explorer shows limited data for external networks.
+          </p>
+          <a
+            href={targetNetwork.blockExplorers?.default.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary"
+          >
+            View on {targetNetwork.blockExplorers?.default.name}
+          </a>
+        </div>
+      ) : (
+        <>
+          <TransactionsTable blocks={blocks} transactionReceipts={transactionReceipts} />
+          <PaginationButton
+            currentPage={currentPage}
+            totalItems={Number(totalBlocks)}
+            setCurrentPage={setCurrentPage}
+            hasTransactions={hasTransactions}
+          />
+        </>
+      )}
     </div>
   );
 };
