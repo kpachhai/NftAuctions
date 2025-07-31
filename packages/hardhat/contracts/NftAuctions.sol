@@ -2,13 +2,15 @@
 pragma solidity ^0.8.20;
 
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import { ERC1363 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC1363.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
+// EIP-2981 Royalty Interface
+interface IERC2981 {
+    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
+}
+
+contract NftAuctions is Ownable, ReentrancyGuard {
     struct Auction {
         uint256 auctionId;
         address seller;
@@ -45,7 +47,13 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
     event AuctionEnded(uint256 auctionId, address indexed winner, uint256 winningBid);
 
-    constructor(address initialOwner) ERC20("NftAuctions", "NFTA") ERC20Permit("NftAuctions") Ownable(initialOwner) {}
+    event RoyaltyPaid(uint256 auctionId, address indexed receiver, uint256 royaltyAmount);
+
+    event AuctionWithdrawn(uint256 auctionId, address indexed seller);
+
+    event AuctionCancelled(uint256 auctionId, address indexed seller, address indexed highestBidder);
+
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     receive() external payable {}
 
@@ -67,7 +75,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
             auctionId: auctionId,
             seller: msg.sender,
             highestBidder: address(0),
-            highestBid: _startingPriceWei,
+            highestBid: 0, // Initialize to 0, not starting price
             startTime: block.timestamp,
             endTime: endTime,
             startingPrice: _startingPriceWei,
@@ -95,6 +103,7 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
     function placeBid(uint256 _auctionId) external payable nonReentrant {
         Auction storage auction = auctions[_auctionId];
         require(auction.seller != address(0), "Auction does not exist");
+        require(!auction.ended, "Auction ended");
         require(block.timestamp < auction.endTime, "Auction ended");
         require(msg.value > auction.highestBid, "Bid too low");
         require(!auction.ended, "Auction already ended");
@@ -122,8 +131,26 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
         if (auction.highestBidder != address(0)) {
             auction.nftContract.transferFrom(address(this), auction.highestBidder, auction.tokenId);
-            payable(auction.seller).transfer(auction.highestBid);
-            emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
+            
+            // Handle royalties if the NFT contract supports EIP-2981
+            try IERC2981(address(auction.nftContract)).royaltyInfo(auction.tokenId, auction.highestBid) returns (address receiver, uint256 royaltyAmount) {
+                if (royaltyAmount > 0 && receiver != address(0)) {
+                    // Pay royalty to the receiver
+                    payable(receiver).transfer(royaltyAmount);
+                    emit RoyaltyPaid(_auctionId, receiver, royaltyAmount);
+                    
+                    // Pay remaining amount to seller
+                    uint256 sellerAmount = auction.highestBid - royaltyAmount;
+                    payable(auction.seller).transfer(sellerAmount);
+                } else {
+                    // No royalty, pay full amount to seller
+                    payable(auction.seller).transfer(auction.highestBid);
+                }
+            } catch {
+                // NFT contract doesn't support EIP-2981, pay full amount to seller
+                payable(auction.seller).transfer(auction.highestBid);
+            }
+             emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
         } else {
             auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
             emit AuctionEnded(_auctionId, address(0), 0);
@@ -156,6 +183,15 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
 
         expiredAuctionIndex[_auctionId] = expiredAuctionIds.length;
         expiredAuctionIds.push(_auctionId);
+    }
+
+    // Helper function to get royalty info
+    function getRoyaltyInfo(address nftContract, uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount) {
+        try IERC2981(nftContract).royaltyInfo(tokenId, salePrice) returns (address _receiver, uint256 _royaltyAmount) {
+            return (_receiver, _royaltyAmount);
+        } catch {
+            return (address(0), 0);
+        }
     }
 
     function getAuction(uint256 _auctionId) external view returns (Auction memory) {
@@ -226,5 +262,38 @@ contract NftAuctions is ERC20, ERC1363, ERC20Permit, Ownable, ReentrancyGuard {
                 _moveToExpired(auctionId);
             }
         }
+    }
+
+    function withdrawAuction(uint256 _auctionId) external nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.seller != address(0), "Auction does not exist");
+        require(msg.sender == auction.seller, "Only seller can withdraw");
+        require(!auction.ended, "Auction already ended");
+        require(auction.highestBidder == address(0), "Cannot withdraw after bids");
+
+        auction.ended = true;
+
+        // Return NFT to seller
+        auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
+
+        emit AuctionWithdrawn(_auctionId, auction.seller);
+    }
+
+    function emergencyWithdraw(uint256 _auctionId) external onlyOwner nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.seller != address(0), "Auction does not exist");
+        require(!auction.ended, "Auction already ended");
+
+        auction.ended = true;
+
+        // Return NFT to seller
+        auction.nftContract.transferFrom(address(this), auction.seller, auction.tokenId);
+
+        // Refund highest bidder if any
+        if (auction.highestBidder != address(0)) {
+            payable(auction.highestBidder).transfer(auction.highestBid);
+        }
+
+        emit AuctionCancelled(_auctionId, auction.seller, auction.highestBidder);
     }
 }

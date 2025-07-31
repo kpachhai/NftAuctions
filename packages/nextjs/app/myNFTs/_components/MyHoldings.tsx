@@ -41,7 +41,7 @@ export const MyHoldings = () => {
           ]);
 
           const tokenURI = await yourCollectibleContract.read.tokenURI([tokenId]);
-          const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "");
+          const ipfsHash = tokenURI.replace("https://ipfs.io/ipfs/", "").replace("ipfs://", "");
           const nftMetadata = await getMetadataFromIPFS(ipfsHash);
 
           collectibleUpdate.push({
@@ -62,6 +62,7 @@ export const MyHoldings = () => {
     };
 
     updateMyCollectibles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, myTotalBalance]);
 
   if (allCollectiblesLoading) {

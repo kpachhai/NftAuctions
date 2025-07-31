@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { parseGwei } from "viem";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { NFTMetaData } from "~~/utils/simpleNFT/nftsMetadata";
@@ -93,7 +94,16 @@ export const NFTCard = ({ nft }: { nft: Collectible }) => {
   return (
     <div className="card card-compact bg-base-100 shadow-lg w-80">
       <figure className="relative">
-        <img src={nft.image} alt={nft.name || `NFT #${nft.id}`} className="h-60 w-full object-cover" />
+        <Image
+          src={
+            nft.image ||
+            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240' viewBox='0 0 320 240'%3E%3Crect width='320' height='240' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-family='Arial' font-size='16'%3ENFT Image%3C/text%3E%3C/svg%3E"
+          }
+          alt={nft.name || `NFT #${nft.id}`}
+          width={320}
+          height={240}
+          className="h-60 w-full object-cover"
+        />
       </figure>
       <div className="card-body space-y-3">
         <div className="flex items-center justify-center">

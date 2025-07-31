@@ -1,5 +1,3 @@
-"use server";
-
 import { ipfsClient } from "~~/utils/simpleNFT/ipfs";
 
 export async function POST(request: Request) {

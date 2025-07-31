@@ -28,38 +28,47 @@ export const useFetchBlocks = () => {
     [key: string]: TransactionReceipt;
   }>({});
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalBlocks, setTotalBlocks] = useState(0n);
+  const [totalBlocksWithTransactions, setTotalBlocksWithTransactions] = useState(0);
   const [error, setError] = useState<Error | null>(null);
+  const [allBlocksWithTransactions, setAllBlocksWithTransactions] = useState<Block[]>([]);
 
-  const fetchBlocks = useCallback(async () => {
+  const fetchAllBlocksWithTransactions = useCallback(async () => {
     setError(null);
 
     try {
       const blockNumber = await testClient.getBlockNumber();
-      setTotalBlocks(blockNumber);
 
-      const startingBlock = blockNumber - BigInt(currentPage * BLOCKS_PER_PAGE);
-      const blockNumbersToFetch = Array.from(
-        { length: Number(BLOCKS_PER_PAGE < startingBlock + 1n ? BLOCKS_PER_PAGE : startingBlock + 1n) },
-        (_, i) => startingBlock - BigInt(i),
-      );
+      // Start from the latest block and work backwards to find ALL blocks with transactions
+      let startingBlock = blockNumber;
+      const blocksWithTransactions: Block[] = [];
+      let blocksChecked = 0;
+      const maxBlocksToCheck = 100000; // Search through ~1.5 weeks worth of blocks (10-second intervals)
 
-      const blocksWithTransactions = blockNumbersToFetch.map(async blockNumber => {
+      while (blocksChecked < maxBlocksToCheck && startingBlock > 0) {
         try {
-          return testClient.getBlock({ blockNumber, includeTransactions: true });
+          const block = await testClient.getBlock({ blockNumber: startingBlock, includeTransactions: true });
+
+          // Only include blocks that have transactions
+          if (block.transactions && block.transactions.length > 0) {
+            blocksWithTransactions.push(block);
+          }
+
+          startingBlock--;
+          blocksChecked++;
         } catch (err) {
           setError(err instanceof Error ? err : new Error("An error occurred."));
-          throw err;
+          break;
         }
-      });
-      const fetchedBlocks = await Promise.all(blocksWithTransactions);
+      }
 
-      fetchedBlocks.forEach(block => {
+      // Decode transaction data for all blocks
+      blocksWithTransactions.forEach(block => {
         block.transactions.forEach(tx => decodeTransactionData(tx as Transaction));
       });
 
+      // Get transaction receipts for all transactions
       const txReceipts = await Promise.all(
-        fetchedBlocks.flatMap(block =>
+        blocksWithTransactions.flatMap(block =>
           block.transactions.map(async tx => {
             try {
               const receipt = await testClient.getTransactionReceipt({ hash: (tx as Transaction).hash });
@@ -72,27 +81,36 @@ export const useFetchBlocks = () => {
         ),
       );
 
-      setBlocks(fetchedBlocks);
+      setAllBlocksWithTransactions(blocksWithTransactions);
+      setTotalBlocksWithTransactions(blocksWithTransactions.length);
       setTransactionReceipts(prevReceipts => ({ ...prevReceipts, ...Object.assign({}, ...txReceipts) }));
     } catch (err) {
       setError(err instanceof Error ? err : new Error("An error occurred."));
     }
-  }, [currentPage]);
+  }, []);
+
+  // Update the displayed blocks based on current page
+  useEffect(() => {
+    const startIndex = currentPage * BLOCKS_PER_PAGE;
+    const endIndex = startIndex + BLOCKS_PER_PAGE;
+    const pageBlocks = allBlocksWithTransactions.slice(startIndex, endIndex);
+    setBlocks(pageBlocks);
+  }, [currentPage, allBlocksWithTransactions]);
 
   useEffect(() => {
-    fetchBlocks();
-  }, [fetchBlocks]);
+    fetchAllBlocksWithTransactions();
+  }, [fetchAllBlocksWithTransactions]);
 
   useEffect(() => {
     const handleNewBlock = async (newBlock: any) => {
       try {
-        if (currentPage === 0) {
-          if (newBlock.transactions.length > 0) {
-            const transactionsDetails = await Promise.all(
-              newBlock.transactions.map((txHash: string) => testClient.getTransaction({ hash: txHash as Hash })),
-            );
-            newBlock.transactions = transactionsDetails;
-          }
+        // Only add new blocks if they have transactions
+        if (newBlock.transactions && newBlock.transactions.length > 0) {
+          // Get full transaction details
+          const transactionsDetails = await Promise.all(
+            newBlock.transactions.map((txHash: string) => testClient.getTransaction({ hash: txHash as Hash })),
+          );
+          newBlock.transactions = transactionsDetails;
 
           newBlock.transactions.forEach((tx: Transaction) => decodeTransactionData(tx as Transaction));
 
@@ -108,11 +126,10 @@ export const useFetchBlocks = () => {
             }),
           );
 
-          setBlocks(prevBlocks => [newBlock, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)]);
+          // Add the new block to the beginning of our list
+          setAllBlocksWithTransactions(prevBlocks => [newBlock, ...prevBlocks]);
+          setTotalBlocksWithTransactions(prev => prev + 1);
           setTransactionReceipts(prevReceipts => ({ ...prevReceipts, ...Object.assign({}, ...receipts) }));
-        }
-        if (newBlock.number) {
-          setTotalBlocks(newBlock.number);
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error("An error occurred."));
@@ -120,13 +137,13 @@ export const useFetchBlocks = () => {
     };
 
     return testClient.watchBlocks({ onBlock: handleNewBlock, includeTransactions: true });
-  }, [currentPage]);
+  }, []);
 
   return {
     blocks,
     transactionReceipts,
     currentPage,
-    totalBlocks,
+    totalBlocks: BigInt(totalBlocksWithTransactions),
     setCurrentPage,
     error,
   };

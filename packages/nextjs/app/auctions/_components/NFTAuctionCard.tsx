@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { formatEther, parseGwei } from "viem";
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
@@ -34,6 +35,19 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
     args: [auction.auctionId],
     watch: true,
   });
+
+  // Check if current user is the seller
+  const isSeller = connectedAddress?.toLowerCase() === auction.seller.toLowerCase();
+
+  // Check if current user is the owner (for emergency withdraw)
+  const { data: contractOwner } = useScaffoldReadContract({
+    contractName: "NftAuctions",
+    functionName: "owner",
+  });
+  const isOwner = connectedAddress?.toLowerCase() === contractOwner?.toLowerCase();
+
+  // Check if auction can be withdrawn (no bids placed)
+  const canWithdraw = auction.highestBidder === "0x0000000000000000000000000000000000000000";
 
   const handlePlaceBid = async () => {
     if (!bidAmount) {
@@ -87,6 +101,28 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
     } finally {
       setIsClaimLoading(false);
       refetchAuctionState();
+    }
+  };
+
+  const handleWithdrawAuction = async () => {
+    try {
+      await placeBidAsync({
+        functionName: "withdrawAuction",
+        args: [BigInt(auction.auctionId)],
+      });
+    } catch (err: any) {
+      console.error("Withdraw auction failed:", err);
+    }
+  };
+
+  const handleEmergencyWithdraw = async () => {
+    try {
+      await placeBidAsync({
+        functionName: "emergencyWithdraw",
+        args: [BigInt(auction.auctionId)],
+      });
+    } catch (err: any) {
+      console.error("Emergency withdraw failed:", err);
     }
   };
 
@@ -145,7 +181,13 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
   return (
     <div className="card card-compact bg-base-100 shadow-lg w-[325px] shadow-secondary">
       <figure className="relative">
-        <img src={auction.image} alt="NFT Image" className="h-60 min-w-full object-cover" />
+        <Image
+          src={auction.image || "/placeholder-nft.png"}
+          alt="NFT Image"
+          width={325}
+          height={240}
+          className="h-60 min-w-full object-cover"
+        />
         <figcaption className="glass absolute bottom-4 left-4 p-4 rounded-xl">
           <span className="text-white">#{auction.tokenId.toString()}</span>
         </figcaption>
@@ -224,6 +266,20 @@ export const NFTAuctionCard = ({ auction }: { auction: Auction }) => {
 
         {auction.seller.toLowerCase() === connectedAddress?.toLowerCase() && (
           <div className="text-center text-info text-xs">You are the seller</div>
+        )}
+
+        {/* Seller Withdraw Button - Only show if user is seller and no bids */}
+        {isSeller && canWithdraw && (
+          <button className="btn btn-warning w-full" onClick={handleWithdrawAuction} disabled={auction.ended}>
+            Withdraw Auction
+          </button>
+        )}
+
+        {/* Owner Emergency Withdraw Button - Only show if user is owner */}
+        {isOwner && (
+          <button className="btn btn-error w-full" onClick={handleEmergencyWithdraw} disabled={auction.ended}>
+            Emergency Withdraw
+          </button>
         )}
       </div>
     </div>
