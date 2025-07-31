@@ -20,7 +20,7 @@ describe("NftAuctions", function () {
     [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
     const YourCollectibleFactory = await ethers.getContractFactory("YourCollectible");
-    yourCollectible = await YourCollectibleFactory.connect(owner).deploy();
+    yourCollectible = (await YourCollectibleFactory.deploy()) as YourCollectible;
     await yourCollectible.waitForDeployment();
 
     const NftAuctionsFactory = await ethers.getContractFactory("NftAuctions");
@@ -186,8 +186,8 @@ describe("NftAuctions", function () {
       [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
       // Deploy mock ERC721
-      const YourCollectible = await ethers.getContractFactory("contracts/YourCollectible.sol:YourCollectible");
-      yourCollectible = await YourCollectible.deploy();
+      const YourCollectibleFactory = await ethers.getContractFactory("YourCollectible");
+      yourCollectible = (await YourCollectibleFactory.deploy()) as YourCollectible;
       await yourCollectible.waitForDeployment();
 
       // Mint NFT to seller
