@@ -62,6 +62,7 @@ export const MyHoldings = () => {
     };
 
     updateMyCollectibles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, myTotalBalance]);
 
   if (allCollectiblesLoading) {

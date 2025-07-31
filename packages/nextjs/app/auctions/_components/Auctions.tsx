@@ -101,6 +101,7 @@ const AuctionList = ({ title, emptyMessage, fetchFunction }: AuctionListProps) =
     };
 
     updateAuctions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auctionsFromContract, connectedAddress]);
 
   if (auctionsLoading) {
